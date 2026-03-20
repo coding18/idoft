@@ -1,46 +1,56 @@
-name: Verify Flaky Test - Flink CEPOperatorTest
+name: Verify Flaky Test - NiFi LdapUserGroupProviderTest
 
 on:
-  workflow_dispatch:  # lets you trigger it manually with a button
+  workflow_dispatch:
 
 jobs:
   verify-flaky:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
       - name: Set up Java 8
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '8'
           distribution: 'temurin'
 
-      - name: Clone Apache Flink at the detected commit
+      - name: Clone Apache NiFi at detected commit
         run: |
-          git clone https://github.com/apache/flink.git
-          cd flink
-          git checkout 23c9b5ac50d04d28a34a87c78eb2d3331c06b74b
+          git clone https://github.com/apache/nifi.git
+          cd nifi
+          git checkout 2bd752d868a8f3e36113b078bb576cf054e945e8
 
-      - name: Build the flink-cep module (skip tests)
+      - name: Build the module and dependencies (skip tests)
         run: |
-          cd flink
-          mvn clean install -DskipTests -pl flink-libraries/flink-cep -am \
-            -Drat.skip=true -Dcheckstyle.skip=true
-        timeout-minutes: 30
+          cd nifi
+          mvn clean install -DskipTests \
+            -pl nifi-registry/nifi-registry-core/nifi-registry-framework \
+            -am \
+            -Drat.skip=true \
+            -Dcheckstyle.skip=true \
+            -Dlicense.skip=true \
+            --no-transfer-progress
+        timeout-minutes: 45
 
       - name: Run test normally (should PASS)
         run: |
-          cd flink
-          mvn -pl flink-libraries/flink-cep test \
-            -Dtest=org.apache.flink.cep.operator.CEPOperatorTest#testCEPOperatorComparatorEventTime \
-            -Drat.skip=true -Dcheckstyle.skip=true
+          cd nifi
+          mvn -pl nifi-registry/nifi-registry-core/nifi-registry-framework test \
+            -Dtest=org.apache.nifi.registry.security.ldap.tenants.LdapUserGroupProviderTest#testUserIdentityMappingWithTransforms \
+            -Drat.skip=true \
+            -Dcheckstyle.skip=true \
+            --no-transfer-progress
         continue-on-error: true
 
       - name: Run test with NonDex (should FAIL)
         run: |
-          cd flink
-          mvn -pl flink-libraries/flink-cep \
+          cd nifi
+          mvn -pl nifi-registry/nifi-registry-core/nifi-registry-framework \
             edu.illinois:nondex-maven-plugin:2.1.1:nondex \
-            -Dtest=org.apache.flink.cep.operator.CEPOperatorTest#testCEPOperatorComparatorEventTime \
+            -Dtest=org.apache.nifi.registry.security.ldap.tenants.LdapUserGroupProviderTest#testUserIdentityMappingWithTransforms \
             -DnondexRuns=10 \
-            -Drat.skip=true -Dcheckstyle.skip=true
+            -Drat.skip=true \
+            -Dcheckstyle.skip=true \
+            --no-transfer-progress
         continue-on-error: true
